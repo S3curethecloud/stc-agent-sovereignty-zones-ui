@@ -693,7 +693,9 @@ function ExplanationRow({ item }: { item: Explanation }) {
     <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm font-semibold text-white">{item.reason_code}</p>
-        <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${statusClass(item.outcome)}`}>{item.outcome}</span>
+        <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${statusClass(item.outcome)}`}>
+          {item.reason_code === "ASSERTION_VERIFIED_LOCAL_OPA_REQUIRED" ? "VERIFIED" : item.outcome}
+        </span>
       </div>
       <p className="mt-3 text-sm leading-6 text-slate-300">{item.summary}</p>
       <p className="mt-2 text-xs leading-5 text-slate-500">{item.operator_action}</p>

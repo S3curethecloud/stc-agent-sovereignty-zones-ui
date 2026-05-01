@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -13,12 +13,10 @@ import {
   LockKeyhole,
   Network,
   ServerCog,
-  ShieldCheck,
   FileCheck2,
   AlertTriangle,
   Database,
   RefreshCcw,
-  Activity,
   XCircle,
 } from "lucide-react";
 
@@ -84,6 +82,36 @@ type ExplanationsResponse = {
   read_only: true;
   count: number;
   explanations: Explanation[];
+};
+
+type OutboundHandshakeResponse = {
+  status: "assertion_created" | string;
+  assertion_id: string;
+  expires_at: number;
+  envelope: Record<string, unknown>;
+};
+
+type InboundHandshakeResponse = {
+  status: "verified_requires_local_opa_decision" | string;
+  assertion_id: string;
+  origin_zone: string;
+  destination_zone: string;
+  runtime_contract: {
+    tenant_id: string;
+    principal: string;
+    intent: string;
+    scopes: string[];
+    ttl_seconds: number;
+    context: Record<string, unknown>;
+    local_decision_authority: "OPA" | string;
+    authorization_status: "requires_local_opa_decision" | string;
+  };
+  warning: string;
+};
+
+type HandshakeResult = {
+  outbound?: OutboundHandshakeResponse;
+  inbound?: InboundHandshakeResponse;
 };
 
 type DashboardState = {
@@ -162,6 +190,32 @@ async function fetchJson<T>(path: string): Promise<T> {
 
   if (!res.ok) {
     throw new Error(`${path} failed with ${res.status}`);
+  }
+
+  return res.json() as Promise<T>;
+}
+
+async function postJson<T>(path: string, payload: unknown): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify(payload),
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    let detail = `${path} failed with ${res.status}`;
+
+    try {
+      const body = await res.json();
+      if (body?.detail) {
+        detail = `${detail}: ${body.detail}`;
+      }
+    } catch {
+      // Keep deterministic fallback detail.
+    }
+
+    throw new Error(detail);
   }
 
   return res.json() as Promise<T>;
@@ -303,6 +357,209 @@ function StatusPanel({ audit }: { audit?: AuditResponse }) {
         Verified for local OPA evaluation — not execution approval.
       </div>
     </div>
+  );
+}
+
+function HandshakeSimulator({ onComplete }: { onComplete: () => Promise<void> }) {
+  const [originZone, setOriginZone] = useState("zone-a");
+  const [destinationZone, setDestinationZone] = useState("zone-b");
+  const [principal, setPrincipal] = useState("agent-demo");
+  const [intent, setIntent] = useState("zone:handoff");
+  const [scopeText, setScopeText] = useState("zone:handoff");
+  const [running, setRunning] = useState(false);
+  const [result, setResult] = useState<HandshakeResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function runHandshake(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    setRunning(true);
+    setError(null);
+    setResult(null);
+
+    try {
+      const scopes = scopeText
+        .split(",")
+        .map((scope) => scope.trim())
+        .filter(Boolean);
+
+      const outbound = await postJson<OutboundHandshakeResponse>(
+        "/v1/zones/handshake/outbound",
+        {
+          origin_zone: originZone,
+          destination_zone: destinationZone,
+          principal,
+          intent,
+          scopes,
+          context: {
+            source: "asz-platform-ui",
+          },
+          ttl_seconds: 120,
+          policy_revision: "asz-ui-demo-1",
+        }
+      );
+
+      const inbound = await postJson<InboundHandshakeResponse>(
+        "/v1/zones/handshake/inbound",
+        {
+          envelope: outbound.envelope,
+        }
+      );
+
+      setResult({ outbound, inbound });
+      await onComplete();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Handshake failed.");
+      await onComplete();
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  return (
+    <section className="border-y border-slate-800/80 bg-[#05070d] px-6 py-20">
+      <div className="mx-auto max-w-7xl">
+        <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-end">
+          <div>
+            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.28em] text-sky-300">
+              Live handshake simulator
+            </p>
+            <h2 className="text-3xl font-bold tracking-tight text-white md:text-5xl">
+              Generate Cross-Zone Activity
+            </h2>
+            <p className="mt-4 max-w-3xl text-base leading-8 text-slate-300">
+              Create a signed outbound assertion, submit it to the inbound verifier, then refresh events, DDR explanations, and the audit chain.
+            </p>
+          </div>
+          <div className="rounded-full border border-amber-300/20 bg-amber-300/10 px-4 py-2 text-xs font-semibold text-amber-200">
+            Verified ≠ Authorized
+          </div>
+        </div>
+
+        <div className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
+          <form
+            onSubmit={runHandshake}
+            className="rounded-3xl border border-slate-700/60 bg-slate-950/70 p-5"
+          >
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="text-sm font-medium text-slate-300">
+                Origin Zone
+                <input
+                  value={originZone}
+                  onChange={(event) => setOriginZone(event.target.value)}
+                  className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-white outline-none focus:border-sky-300"
+                />
+              </label>
+
+              <label className="text-sm font-medium text-slate-300">
+                Destination Zone
+                <input
+                  value={destinationZone}
+                  onChange={(event) => setDestinationZone(event.target.value)}
+                  className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-white outline-none focus:border-sky-300"
+                />
+              </label>
+
+              <label className="text-sm font-medium text-slate-300">
+                Principal
+                <input
+                  value={principal}
+                  onChange={(event) => setPrincipal(event.target.value)}
+                  className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-white outline-none focus:border-sky-300"
+                />
+              </label>
+
+              <label className="text-sm font-medium text-slate-300">
+                Intent
+                <input
+                  value={intent}
+                  onChange={(event) => setIntent(event.target.value)}
+                  className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-white outline-none focus:border-sky-300"
+                />
+              </label>
+
+              <label className="text-sm font-medium text-slate-300 md:col-span-2">
+                Scopes
+                <input
+                  value={scopeText}
+                  onChange={(event) => setScopeText(event.target.value)}
+                  className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-white outline-none focus:border-sky-300"
+                  placeholder="zone:handoff, agent:execute"
+                />
+              </label>
+            </div>
+
+            <button
+              type="submit"
+              disabled={running}
+              className="mt-5 inline-flex w-full items-center justify-center rounded-full bg-gradient-to-r from-sky-400 to-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-[0_0_40px_rgba(56,189,248,0.22)] transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {running ? "Running Cross-Zone Handshake..." : "Run Cross-Zone Handshake"}
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </button>
+          </form>
+
+          <div className="rounded-3xl border border-slate-700/60 bg-slate-950/70 p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-white">Handshake Result</h3>
+              <span className="rounded-full border border-amber-300/20 bg-amber-300/10 px-3 py-1 text-xs font-semibold text-amber-200">
+                Local OPA Required
+              </span>
+            </div>
+
+            {error ? (
+              <div className="rounded-2xl border border-rose-400/20 bg-rose-400/10 p-4 text-sm leading-6 text-rose-100">
+                <div className="mb-2 flex items-center gap-2 font-semibold">
+                  <XCircle className="h-4 w-4" />
+                  Handshake rejected
+                </div>
+                {error}
+                <p className="mt-2 text-rose-100/75">
+                  Rejected before local OPA. No runtime authorization granted.
+                </p>
+              </div>
+            ) : null}
+
+            {result?.inbound ? (
+              <div className="space-y-3">
+                <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/10 p-4">
+                  <p className="text-sm font-semibold text-emerald-200">
+                    Verified for local OPA evaluation — not execution approval.
+                  </p>
+                  <p className="mt-2 text-xs leading-5 text-emerald-100/80">
+                    Assertion {result.inbound.assertion_id} moved from {result.inbound.origin_zone} to {result.inbound.destination_zone}.
+                  </p>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4 text-xs">
+                    <p className="text-slate-500">Outbound</p>
+                    <p className="mt-1 font-semibold text-white">{result.outbound?.status}</p>
+                    <p className="mt-1 text-slate-400">expires_at: {result.outbound?.expires_at}</p>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4 text-xs">
+                    <p className="text-slate-500">Inbound</p>
+                    <p className="mt-1 font-semibold text-white">{result.inbound.status}</p>
+                    <p className="mt-1 text-slate-400">
+                      authority: {result.inbound.runtime_contract.local_decision_authority}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4 text-xs leading-5 text-slate-300">
+                  {result.inbound.warning}
+                </div>
+              </div>
+            ) : !error ? (
+              <div className="rounded-2xl border border-dashed border-slate-700 p-5 text-sm leading-6 text-slate-500">
+                Run a handshake to create live events, DDR explanations, and audit-chain records.
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -490,10 +747,12 @@ export default function AgentSovereigntyZonesPage() {
             </p>
           </div>
           <StatusPanel audit={state.audit} />
-        </div>
-      </section>
+                                               </div>
+                                      </section>
 
-      <DataPanel state={state} loading={loading} error={error} onRefresh={loadDashboard} />
+                                     <HandshakeSimulator onComplete={loadDashboard} />
+
+                                     <DataPanel state={state} loading={loading} error={error} onRefresh={loadDashboard} />
 
       <section className="border-y border-slate-800/80 bg-[#080b14] px-6 py-24 md:py-32">
         <div className="mx-auto max-w-7xl">

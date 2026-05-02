@@ -658,6 +658,16 @@ function DataPanel({ state, loading, error, onRefresh }: { state: DashboardState
             </div>
           </div>
 
+          <div className="rounded-3xl border border-slate-700/60 bg-slate-950/70 p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-white">DDR Explanations</h3>
+              <span className="text-xs text-slate-500">{state.explanations?.count ?? 0} explanations</span>
+            </div>
+            <div className="space-y-3">
+              {explanations.length ? explanations.map((item, index) => <ExplanationRow key={`${item.reason_code}-${index}`} item={item} />) : <Empty label="No explanations returned" />}
+            </div>
+          </div>
+
           <div className="rounded-3xl border border-rose-400/30 bg-rose-950/30 p-5 lg:col-span-2">
             <div className="mb-4 flex flex-col justify-between gap-3 md:flex-row md:items-center">
               <div>
@@ -665,9 +675,9 @@ function DataPanel({ state, loading, error, onRefresh }: { state: DashboardState
                   <AlertTriangle className="h-5 w-5 text-rose-300" />
                   <h3 className="text-lg font-semibold text-white">Tamper-Evident Audit Demo</h3>
                 </div>
-                <p className="max-w-3xl text-sm leading-6 text-rose-100/75">
-                  ASZ clones the audit chain, changes one field in the cloned event, and proves the hash chain breaks.
-                  The persisted Redis audit chain is not modified.
+                <p className="max-w-4xl text-sm leading-6 text-rose-100/75">
+                  Safe simulation: ASZ creates a temporary copy of the audit chain, changes one field in that copy,
+                  and verifies that the copied chain breaks. The real Redis-backed audit chain remains unchanged and verified.
                 </p>
               </div>
               <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${
@@ -675,27 +685,27 @@ function DataPanel({ state, loading, error, onRefresh }: { state: DashboardState
                   ? "border-rose-400/30 bg-rose-400/10 text-rose-200"
                   : "border-amber-400/30 bg-amber-400/10 text-amber-200"
               }`}>
-                {tamperDemo?.tampered_chain_verified === false ? "Tamper Detected" : "Pending Demo"}
+                {tamperDemo?.tampered_chain_verified === false ? "Tamper Simulation Detected" : "Pending Demo"}
               </span>
             </div>
 
             <div className="grid gap-4 md:grid-cols-3">
               <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
-                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Original Chain</p>
+                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Real Audit Chain</p>
                 <p className={`mt-2 text-sm font-semibold ${tamperDemo?.original_chain_verified ? "text-emerald-300" : "text-rose-300"}`}>
                   {tamperDemo?.original_chain_verified ? "Verified" : "Unverified"}
                 </p>
               </div>
 
               <div className="rounded-2xl border border-rose-400/20 bg-rose-400/10 p-4">
-                <p className="text-xs uppercase tracking-[0.2em] text-rose-200/70">Tampered Projection</p>
+                <p className="text-xs uppercase tracking-[0.2em] text-rose-200/70">Simulated Tampered Copy</p>
                 <p className={`mt-2 text-sm font-semibold ${tamperDemo?.tampered_chain_verified === false ? "text-rose-200" : "text-amber-200"}`}>
                   {tamperDemo?.tampered_chain_verified === false ? "Broken Hash Chain" : "Pending"}
                 </p>
               </div>
 
               <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
-                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Tampered Field</p>
+                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Field Changed in Copy</p>
                 <p className="mt-2 text-sm font-semibold text-white">
                   {tamperDemo?.tampered_field || "—"}
                 </p>
@@ -704,24 +714,17 @@ function DataPanel({ state, loading, error, onRefresh }: { state: DashboardState
 
             <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-950/70 p-4 text-xs leading-5 text-slate-300">
               <p>
-                Tampered event:{" "}
+                Cloned event tested:{" "}
                 <span className="font-mono text-rose-200">
                   {shortHash(tamperDemo?.tampered_event_id)}
                 </span>
               </p>
               <p className="mt-2 text-slate-400">
-                {tamperDemo?.tamper_description || "Run a handshake to create audit records, then refresh this tamper-evidence demo."}
+                Only the cloned audit event was modified for this demo. The persisted Redis audit chain was not changed.
               </p>
-            </div>
-          </div>
-
-          <div className="rounded-3xl border border-slate-700/60 bg-slate-950/70 p-5">
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-white">DDR Explanations</h3>
-              <span className="text-xs text-slate-500">{state.explanations?.count ?? 0} explanations</span>
-            </div>
-            <div className="space-y-3">
-              {explanations.length ? explanations.map((item, index) => <ExplanationRow key={`${item.reason_code}-${index}`} item={item} />) : <Empty label="No explanations returned" />}
+              <p className="mt-2 text-slate-500">
+                Refresh behavior: Refresh re-runs the safe simulation against the latest persisted audit chain. It does not clear audit history.
+              </p>
             </div>
           </div>
         </div>
@@ -820,12 +823,12 @@ export default function AgentSovereigntyZonesPage() {
             </p>
           </div>
           <StatusPanel audit={state.audit} />
-                                               </div>
-                                      </section>
+        </div>
+      </section>
 
-                                     <HandshakeSimulator onComplete={loadDashboard} />
+      <HandshakeSimulator onComplete={loadDashboard} />
 
-                                     <DataPanel state={state} loading={loading} error={error} onRefresh={loadDashboard} />
+      <DataPanel state={state} loading={loading} error={error} onRefresh={loadDashboard} />
 
       <section className="border-y border-slate-800/80 bg-[#080b14] px-6 py-24 md:py-32">
         <div className="mx-auto max-w-7xl">

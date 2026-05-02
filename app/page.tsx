@@ -66,6 +66,17 @@ type AuditResponse = EventsResponse & {
   latest_hash: string;
 };
 
+type TamperDemoResponse = {
+  read_only: true;
+  tamper_demo: true;
+  original_chain_verified: boolean;
+  tampered_chain_verified: boolean;
+  tampered_event_id?: string | null;
+  tampered_field?: string | null;
+  tamper_description: string;
+  events: ZoneEvent[];
+};
+
 type Explanation = {
   decision_type: string;
   outcome: "ALLOW" | "DENY" | "INVALID" | string;
@@ -118,6 +129,7 @@ type DashboardState = {
   registry?: TrustRegistryResponse;
   events?: EventsResponse;
   audit?: AuditResponse;
+  tamperDemo?: TamperDemoResponse;
   explanations?: ExplanationsResponse;
 };
 
@@ -140,7 +152,7 @@ const productPillars = [
   {
     icon: FileCheck2,
     title: "Deterministic Explanation",
-    body: "DDR explains every verification, denial, replay failure, signature failure, and local handoff outcome without generic AI guessing.",
+    body: "DDR explains every verification, denial, replay failure, and local handoff outcome without generic AI guessing.",
   },
   {
     icon: GitBranch,
@@ -567,6 +579,7 @@ function DataPanel({ state, loading, error, onRefresh }: { state: DashboardState
   const zones = useMemo(() => Object.values(state.registry?.zones || {}), [state.registry]);
   const events = state.events?.events || [];
   const auditEvents = state.audit?.events || [];
+  const tamperDemo = state.tamperDemo;
   const explanations = state.explanations?.explanations || [];
 
   return (
@@ -645,6 +658,63 @@ function DataPanel({ state, loading, error, onRefresh }: { state: DashboardState
             </div>
           </div>
 
+          <div className="rounded-3xl border border-rose-400/30 bg-rose-950/30 p-5 lg:col-span-2">
+            <div className="mb-4 flex flex-col justify-between gap-3 md:flex-row md:items-center">
+              <div>
+                <div className="mb-2 flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5 text-rose-300" />
+                  <h3 className="text-lg font-semibold text-white">Tamper-Evident Audit Demo</h3>
+                </div>
+                <p className="max-w-3xl text-sm leading-6 text-rose-100/75">
+                  ASZ clones the audit chain, changes one field in the cloned event, and proves the hash chain breaks.
+                  The persisted Redis audit chain is not modified.
+                </p>
+              </div>
+              <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${
+                tamperDemo?.tampered_chain_verified === false
+                  ? "border-rose-400/30 bg-rose-400/10 text-rose-200"
+                  : "border-amber-400/30 bg-amber-400/10 text-amber-200"
+              }`}>
+                {tamperDemo?.tampered_chain_verified === false ? "Tamper Detected" : "Pending Demo"}
+              </span>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Original Chain</p>
+                <p className={`mt-2 text-sm font-semibold ${tamperDemo?.original_chain_verified ? "text-emerald-300" : "text-rose-300"}`}>
+                  {tamperDemo?.original_chain_verified ? "Verified" : "Unverified"}
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-rose-400/20 bg-rose-400/10 p-4">
+                <p className="text-xs uppercase tracking-[0.2em] text-rose-200/70">Tampered Projection</p>
+                <p className={`mt-2 text-sm font-semibold ${tamperDemo?.tampered_chain_verified === false ? "text-rose-200" : "text-amber-200"}`}>
+                  {tamperDemo?.tampered_chain_verified === false ? "Broken Hash Chain" : "Pending"}
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Tampered Field</p>
+                <p className="mt-2 text-sm font-semibold text-white">
+                  {tamperDemo?.tampered_field || "—"}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-950/70 p-4 text-xs leading-5 text-slate-300">
+              <p>
+                Tampered event:{" "}
+                <span className="font-mono text-rose-200">
+                  {shortHash(tamperDemo?.tampered_event_id)}
+                </span>
+              </p>
+              <p className="mt-2 text-slate-400">
+                {tamperDemo?.tamper_description || "Run a handshake to create audit records, then refresh this tamper-evidence demo."}
+              </p>
+            </div>
+          </div>
+
           <div className="rounded-3xl border border-slate-700/60 bg-slate-950/70 p-5">
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-lg font-semibold text-white">DDR Explanations</h3>
@@ -712,13 +782,14 @@ export default function AgentSovereigntyZonesPage() {
     setLoading(true);
     setError(null);
     try {
-      const [registry, events, audit, explanations] = await Promise.all([
+      const [registry, events, audit, tamperDemo, explanations] = await Promise.all([
         fetchJson<TrustRegistryResponse>("/v1/zones/trust-registry"),
         fetchJson<EventsResponse>("/v1/zones/events"),
         fetchJson<AuditResponse>("/v1/zones/audit"),
+        fetchJson<TamperDemoResponse>("/v1/zones/audit/tamper-demo"),
         fetchJson<ExplanationsResponse>("/v1/zones/explanations"),
       ]);
-      setState({ registry, events, audit, explanations });
+      setState({ registry, events, audit, tamperDemo, explanations });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to load ASZ backend visibility.");
     } finally {

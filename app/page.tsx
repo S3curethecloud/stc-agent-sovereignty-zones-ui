@@ -199,6 +199,10 @@ const useCases = [
   "Partner ecosystems where each organization retains its own governance authority",
 ];
 
+const EVENTS_VISIBLE_LIMIT = 6;
+const AUDIT_VISIBLE_LIMIT = 6;
+const EXPLANATIONS_VISIBLE_LIMIT = 5;
+
 const API_BASE = process.env.NEXT_PUBLIC_ASZ_API_BASE_URL || "";
 const API_KEY = process.env.NEXT_PUBLIC_ASZ_TENANT_API_KEY || "";
 
@@ -599,6 +603,10 @@ function DataPanel({ state, loading, error, onRefresh }: { state: DashboardState
   const tamperDemo = state.tamperDemo;
   const explanations = state.explanations?.explanations || [];
 
+  const visibleEvents = events.slice(-EVENTS_VISIBLE_LIMIT).reverse();
+  const visibleAuditEvents = auditEvents.slice(-AUDIT_VISIBLE_LIMIT).reverse();
+  const visibleExplanations = explanations.slice(-EXPLANATIONS_VISIBLE_LIMIT).reverse();
+
   const [failureRunning, setFailureRunning] = useState<FailureDemoScenario | null>(null);
   const [failureResult, setFailureResult] = useState<FailureDemoResponse | null>(null);
   const [failureError, setFailureError] = useState<string | null>(null);
@@ -678,10 +686,14 @@ function DataPanel({ state, loading, error, onRefresh }: { state: DashboardState
           <div className="rounded-3xl border border-slate-700/60 bg-slate-950/70 p-5">
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-lg font-semibold text-white">Cross-Zone Events</h3>
-              <span className="text-xs text-slate-500">{state.events?.count ?? 0} events</span>
+              <span className="text-xs text-slate-500">
+                {events.length > visibleEvents.length
+                  ? `Showing latest ${visibleEvents.length} of ${events.length} events`
+                  : `${state.events?.count ?? 0} events`}
+              </span>
             </div>
             <div className="space-y-3">
-              {events.length ? events.map((event) => <EventRow key={event.event_id} event={event} />) : <Empty label="No events returned" />}
+              {visibleEvents.length ? visibleEvents.map((event) => <EventRow key={event.event_id} event={event} />) : <Empty label="No events returned" />}
             </div>
           </div>
 
@@ -694,19 +706,28 @@ function DataPanel({ state, loading, error, onRefresh }: { state: DashboardState
             </div>
             <div className="mb-4 rounded-2xl border border-slate-800 bg-slate-900/70 p-4 text-xs text-slate-400">
               Latest hash: <span className="font-mono text-slate-200">{shortHash(state.audit?.latest_hash)}</span>
+              <p className="mt-2 text-slate-500">
+                {auditEvents.length > visibleAuditEvents.length
+                  ? `Showing latest ${visibleAuditEvents.length} of ${auditEvents.length} audit records`
+                  : `${auditEvents.length} audit records`}
+              </p>
             </div>
             <div className="space-y-3">
-              {auditEvents.length ? auditEvents.map((event) => <HashRow key={event.event_id} event={event} />) : <Empty label="No audit records returned" />}
+              {visibleAuditEvents.length ? visibleAuditEvents.map((event) => <HashRow key={event.event_id} event={event} />) : <Empty label="No audit records returned" />}
             </div>
           </div>
 
           <div className="rounded-3xl border border-slate-700/60 bg-slate-950/70 p-5">
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-lg font-semibold text-white">DDR Explanations</h3>
-              <span className="text-xs text-slate-500">{state.explanations?.count ?? 0} explanations</span>
+              <span className="text-xs text-slate-500">
+                {explanations.length > visibleExplanations.length
+                  ? `Showing latest ${visibleExplanations.length} of ${explanations.length} explanations`
+                  : `${state.explanations?.count ?? 0} explanations`}
+              </span>
             </div>
             <div className="space-y-3">
-              {explanations.length ? explanations.map((item, index) => <ExplanationRow key={`${item.reason_code}-${index}`} item={item} />) : <Empty label="No explanations returned" />}
+              {visibleExplanations.length ? visibleExplanations.map((item, index) => <ExplanationRow key={`${item.reason_code}-${index}`} item={item} />) : <Empty label="No explanations returned" />}
             </div>
           </div>
 

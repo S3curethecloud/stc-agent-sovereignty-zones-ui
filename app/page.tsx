@@ -77,6 +77,23 @@ type TamperDemoResponse = {
   events: ZoneEvent[];
 };
 
+type FailureDemoScenario = "invalid_signature" | "replay_attempt";
+
+type FailureDemoResponse = {
+  demo_only: true;
+  scenario: FailureDemoScenario;
+  expected_result: "rejected";
+  assertion_id: string;
+  status_code: number;
+  reason_code: string;
+  event_type: string;
+  failure_event_id?: string | null;
+  audit_recorded: boolean;
+  local_opa_handoff: false;
+  authorization_granted: false;
+  trust_registry_mutated: false;
+};
+
 type Explanation = {
   decision_type: string;
   outcome: "ALLOW" | "DENY" | "INVALID" | string;
@@ -575,12 +592,37 @@ function HandshakeSimulator({ onComplete }: { onComplete: () => Promise<void> })
   );
 }
 
-function DataPanel({ state, loading, error, onRefresh }: { state: DashboardState; loading: boolean; error: string | null; onRefresh: () => void }) {
+function DataPanel({ state, loading, error, onRefresh }: { state: DashboardState; loading: boolean; error: string | null; onRefresh: () => void | Promise<void> }) {
   const zones = useMemo(() => Object.values(state.registry?.zones || {}), [state.registry]);
   const events = state.events?.events || [];
   const auditEvents = state.audit?.events || [];
   const tamperDemo = state.tamperDemo;
   const explanations = state.explanations?.explanations || [];
+
+  const [failureRunning, setFailureRunning] = useState<FailureDemoScenario | null>(null);
+  const [failureResult, setFailureResult] = useState<FailureDemoResponse | null>(null);
+  const [failureError, setFailureError] = useState<string | null>(null);
+
+  async function runFailureScenario(scenario: FailureDemoScenario) {
+    setFailureRunning(scenario);
+    setFailureError(null);
+    setFailureResult(null);
+
+    try {
+      const result = await postJson<FailureDemoResponse>(
+        "/v1/zones/handshake/failure-demo",
+        { scenario }
+      );
+
+      setFailureResult(result);
+      await Promise.resolve(onRefresh());
+    } catch (err) {
+      setFailureError(err instanceof Error ? err.message : "Failure scenario failed.");
+      await Promise.resolve(onRefresh());
+    } finally {
+      setFailureRunning(null);
+    }
+  }
 
   return (
     <section className="border-y border-slate-800/80 bg-[#080b14] px-6 py-24 md:py-32">
@@ -726,6 +768,126 @@ function DataPanel({ state, loading, error, onRefresh }: { state: DashboardState
                 Refresh behavior: Refresh re-runs the safe simulation against the latest persisted audit chain. It does not clear audit history.
               </p>
             </div>
+          </div>
+
+          <div className="rounded-3xl border border-amber-400/30 bg-amber-950/20 p-5 lg:col-span-2">
+            <div className="mb-5 flex flex-col justify-between gap-3 md:flex-row md:items-center">
+              <div>
+                <div className="mb-2 flex items-center gap-2">
+                  <XCircle className="h-5 w-5 text-amber-300" />
+                  <h3 className="text-lg font-semibold text-white">Cross-Zone Failure Scenarios</h3>
+                </div>
+                <p className="max-w-4xl text-sm leading-6 text-amber-100/75">
+                  Valid assertions can cross zones. Invalid assertions fail closed before local OPA.
+                  ASZ records the rejection, explains the reason, and grants no execution authority.
+                </p>
+              </div>
+              <span className="rounded-full border border-amber-400/30 bg-amber-400/10 px-3 py-1 text-xs font-semibold text-amber-200">
+                Fail Closed Demo
+              </span>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-white">Invalid Signature</p>
+                    <p className="mt-2 text-xs leading-5 text-slate-400">
+                      Simulates a modified assertion payload. CIPHER integrity rejects it before local OPA.
+                    </p>
+                  </div>
+                  <span className="rounded-full border border-rose-400/30 bg-rose-400/10 px-3 py-1 text-xs font-semibold text-rose-200">
+                    401
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  disabled={failureRunning !== null}
+                  onClick={() => runFailureScenario("invalid_signature")}
+                  className="mt-4 inline-flex w-full items-center justify-center rounded-full border border-rose-400/30 bg-rose-400/10 px-4 py-3 text-sm font-semibold text-rose-100 transition hover:bg-rose-400/20 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {failureRunning === "invalid_signature" ? "Running Invalid Signature..." : "Run Invalid Signature Demo"}
+                </button>
+              </div>
+
+              <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-white">Replay Attempt</p>
+                    <p className="mt-2 text-xs leading-5 text-slate-400">
+                      Simulates reusing the same assertion ID. Replay protection rejects the duplicate handoff.
+                    </p>
+                  </div>
+                  <span className="rounded-full border border-rose-400/30 bg-rose-400/10 px-3 py-1 text-xs font-semibold text-rose-200">
+                    409
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  disabled={failureRunning !== null}
+                  onClick={() => runFailureScenario("replay_attempt")}
+                  className="mt-4 inline-flex w-full items-center justify-center rounded-full border border-rose-400/30 bg-rose-400/10 px-4 py-3 text-sm font-semibold text-rose-100 transition hover:bg-rose-400/20 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {failureRunning === "replay_attempt" ? "Running Replay Attempt..." : "Run Replay Attempt Demo"}
+                </button>
+              </div>
+            </div>
+
+            {failureError ? (
+              <div className="mt-4 rounded-2xl border border-rose-400/20 bg-rose-400/10 p-4 text-xs leading-5 text-rose-100">
+                {failureError}
+              </div>
+            ) : null}
+
+            {failureResult ? (
+              <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-950/70 p-4 text-xs leading-5 text-slate-300">
+                <div className="grid gap-3 md:grid-cols-4">
+                  <div>
+                    <p className="uppercase tracking-[0.2em] text-slate-500">Scenario</p>
+                    <p className="mt-1 font-semibold text-white">{failureResult.scenario}</p>
+                  </div>
+                  <div>
+                    <p className="uppercase tracking-[0.2em] text-slate-500">Reason</p>
+                    <p className="mt-1 font-semibold text-amber-200">{failureResult.reason_code}</p>
+                  </div>
+                  <div>
+                    <p className="uppercase tracking-[0.2em] text-slate-500">Audit Event</p>
+                    <p className="mt-1 font-semibold text-white">{failureResult.event_type}</p>
+                  </div>
+                  <div>
+                    <p className="uppercase tracking-[0.2em] text-slate-500">Outcome</p>
+                    <p className="mt-1 font-semibold text-rose-200">{failureResult.expected_result}</p>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid gap-3 md:grid-cols-4">
+                  <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3">
+                    <p className="text-slate-500">Audit recorded</p>
+                    <p className="mt-1 font-semibold text-emerald-300">{failureResult.audit_recorded ? "Yes" : "No"}</p>
+                  </div>
+                  <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3">
+                    <p className="text-slate-500">Local OPA handoff</p>
+                    <p className="mt-1 font-semibold text-rose-200">{failureResult.local_opa_handoff ? "Yes" : "No"}</p>
+                  </div>
+                  <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3">
+                    <p className="text-slate-500">Authorization granted</p>
+                    <p className="mt-1 font-semibold text-rose-200">{failureResult.authorization_granted ? "Yes" : "No"}</p>
+                  </div>
+                  <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3">
+                    <p className="text-slate-500">Trust registry mutated</p>
+                    <p className="mt-1 font-semibold text-rose-200">{failureResult.trust_registry_mutated ? "Yes" : "No"}</p>
+                  </div>
+                </div>
+
+                <p className="mt-4 text-slate-500">
+                  Failure demos write rejection evidence to the audit chain. They do not corrupt Redis, mutate the trust registry, create sessions, or authorize execution.
+                </p>
+              </div>
+            ) : (
+              <div className="mt-4 rounded-2xl border border-dashed border-slate-700 p-4 text-xs leading-5 text-slate-500">
+                Run a failure scenario to prove invalid trust is rejected, recorded, and explained.
+              </div>
+            )}
           </div>
         </div>
       </div>

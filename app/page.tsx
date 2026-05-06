@@ -4,7 +4,6 @@ import { type FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
-  CheckCircle2,
   Fingerprint,
   GitBranch,
   Globe2,
@@ -15,7 +14,6 @@ import {
   ServerCog,
   FileCheck2,
   AlertTriangle,
-  Database,
   RefreshCcw,
   XCircle,
 } from "lucide-react";
@@ -150,55 +148,6 @@ type DashboardState = {
   explanations?: ExplanationsResponse;
 };
 
-const productPillars = [
-  {
-    icon: Globe2,
-    title: "Sovereign Governance Domains",
-    body: "Each organization runs its own SecureTheCloud Aegis Runtime with independent policy, risk, audit, and decision authority.",
-  },
-  {
-    icon: KeyRound,
-    title: "Signed Agent Assertions",
-    body: "Cross-zone requests carry signed assertions derived from local runtime truth, not unaudited agent claims.",
-  },
-  {
-    icon: LockKeyhole,
-    title: "Local Re-Evaluation",
-    body: "The receiving zone verifies the assertion, checks trust, and still requires local OPA evaluation before execution.",
-  },
-  {
-    icon: FileCheck2,
-    title: "Deterministic Explanation",
-    body: "DDR explains every verification, denial, replay failure, and local handoff outcome without generic AI guessing.",
-  },
-  {
-    icon: GitBranch,
-    title: "Dual-Zone Audit Anchoring",
-    body: "Both zones can record hash-linked audit events so cross-domain autonomous activity remains provable.",
-  },
-  {
-    icon: ServerCog,
-    title: "Runtime-Ready Integration",
-    body: "A verified cross-zone contract can be adapted into the existing Aegis Runtime token issue path where OPA remains final.",
-  },
-];
-
-const handshakeSteps = [
-  "Zone A creates a signed assertion",
-  "Zone B checks ATLAS trust registry",
-  "CIPHER verifies assertion integrity",
-  "Replay and timestamp protections run",
-  "BRIDGE builds a local runtime contract",
-  "Aegis Runtime sends the request to local OPA",
-];
-
-const useCases = [
-  "Vendor AI agents requesting governed access into enterprise workflows",
-  "Bank, insurance, and claims agents exchanging verifiable handoff context",
-  "Multi-cloud agent systems coordinating across independent runtime domains",
-  "Partner ecosystems where each organization retains its own governance authority",
-];
-
 const EVENTS_VISIBLE_LIMIT = 6;
 const AUDIT_VISIBLE_LIMIT = 6;
 const EXPLANATIONS_VISIBLE_LIMIT = 5;
@@ -275,28 +224,6 @@ function Badge({ children }: { children: React.ReactNode }) {
   );
 }
 
-function SectionHeader({ eyebrow, title, body }: { eyebrow?: string; title: string; body?: string }) {
-  return (
-    <div className="mx-auto mb-12 max-w-3xl text-center">
-      {eyebrow ? <p className="mb-3 text-xs font-semibold uppercase tracking-[0.28em] text-sky-300">{eyebrow}</p> : null}
-      <h2 className="text-3xl font-bold tracking-tight text-white md:text-5xl">{title}</h2>
-      {body ? <p className="mt-5 text-base leading-8 text-slate-300 md:text-lg">{body}</p> : null}
-    </div>
-  );
-}
-
-function Card({ icon: Icon, title, body }: { icon: any; title: string; body: string }) {
-  return (
-    <div className="rounded-3xl border border-slate-700/50 bg-slate-900/50 p-6 shadow-xl shadow-black/10 transition hover:border-sky-300/40 hover:bg-slate-900/75">
-      <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-2xl border border-sky-300/20 bg-sky-300/10 text-sky-300">
-        <Icon className="h-5 w-5" />
-      </div>
-      <h3 className="text-xl font-semibold text-white">{title}</h3>
-      <p className="mt-3 text-sm leading-7 text-slate-300">{body}</p>
-    </div>
-  );
-}
-
 function CTAButtons() {
   return (
     <div className="flex flex-col gap-3 sm:flex-row">
@@ -317,49 +244,62 @@ function CTAButtons() {
   );
 }
 
-function ZoneDiagram() {
-  const left = ["Aegis Runtime", "OPA Authority", "RiskDNA", "DDR Explainer", "Audit Chain"];
-  const right = ["Trust Registry", "Signature Verification", "Replay Protection", "Local Runtime Contract", "Local OPA Required"];
+function ShellHeader({ connected }: { connected: boolean }) {
+  const controlItems = ["Overview", "Trust Ops", "Registry", "Handshake", "Audit", "DDR", "Failures"];
+  const supportItems = ["Observability", "Handoff", "Export"];
 
   return (
-    <div className="rounded-[2rem] border border-sky-300/20 bg-[#070b16] p-5 shadow-2xl shadow-sky-950/30">
-      <div className="grid gap-5 lg:grid-cols-[1fr_0.36fr_1fr]">
-        <div className="rounded-3xl border border-slate-700/60 bg-slate-950/75 p-5">
-          <div className="mb-5 flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-white">Zone A</h3>
-            <span className="rounded-full bg-emerald-400/10 px-3 py-1 text-xs font-semibold text-emerald-300">Sovereign</span>
+    <header className="sticky top-0 z-30 border-b border-sky-400/20 bg-[#020914]/95 shadow-2xl shadow-black/30 backdrop-blur">
+      <div className="border-b border-sky-400/20 bg-[#102949] px-4 py-2 text-xs text-sky-100">
+        Trust Operations Mode · ASZ → Registry → Assertions → Audit → DDR → Sentinel Handoff → Evidence
+      </div>
+      <div className="mx-auto flex max-w-[1440px] flex-col gap-6 px-6 py-6 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex items-center gap-4">
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-300 to-yellow-500 text-slate-950 shadow-[0_0_30px_rgba(250,204,21,0.18)]">
+            <LockKeyhole className="h-6 w-6" />
           </div>
-          <div className="space-y-3">
-            {left.map((item) => (
-              <div key={item} className="rounded-2xl border border-slate-800 bg-slate-900/70 p-3 text-sm font-medium text-slate-200">
-                {item}
-              </div>
-            ))}
+          <div>
+            <div className="text-xl font-black tracking-tight text-white">
+              Secure<span className="text-amber-300">TheCloud</span>
+            </div>
+            <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Agent Sovereignty Zones</p>
           </div>
         </div>
 
-        <div className="flex flex-col items-center justify-center gap-4 rounded-3xl border border-cyan-300/20 bg-cyan-300/10 p-5 text-center">
-          <Fingerprint className="h-8 w-8 text-cyan-200" />
-          <p className="text-sm font-semibold text-white">Signed Assertion</p>
-          <p className="text-xs leading-5 text-cyan-100/80">hash + signature + nonce + policy context</p>
-          <ArrowRight className="hidden h-6 w-6 text-cyan-200 lg:block" />
-        </div>
-
-        <div className="rounded-3xl border border-slate-700/60 bg-slate-950/75 p-5">
-          <div className="mb-5 flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-white">Zone B</h3>
-            <span className="rounded-full bg-sky-400/10 px-3 py-1 text-xs font-semibold text-sky-300">Independent</span>
-          </div>
-          <div className="space-y-3">
-            {right.map((item) => (
-              <div key={item} className="rounded-2xl border border-slate-800 bg-slate-900/70 p-3 text-sm font-medium text-slate-200">
-                {item}
-              </div>
-            ))}
-          </div>
+        <div className="flex flex-wrap items-center gap-3 text-xs font-semibold text-slate-300">
+          <span className={`inline-flex items-center rounded-full border px-4 py-2 ${connected ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-200" : "border-amber-400/20 bg-amber-400/10 text-amber-200"}`}>
+            <span className={`mr-2 h-2 w-2 rounded-full ${connected ? "bg-emerald-400" : "bg-amber-300"}`} />
+            {connected ? "Backend Connected" : "Backend Pending"}
+          </span>
+          <span className="rounded-full border border-slate-700 bg-slate-900 px-4 py-2 text-slate-400">
+            Local OPA Required
+          </span>
         </div>
       </div>
-    </div>
+
+      <nav className="mx-auto flex max-w-[1440px] flex-col gap-4 px-6 pb-5 text-sm md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="mr-2 text-xs font-bold uppercase tracking-[0.28em] text-slate-500">Control</span>
+          {controlItems.map((item, index) => (
+            <a
+              key={item}
+              href={index === 0 ? "#overview" : item === "Handshake" ? "#handshake" : item === "Registry" ? "#evidence" : "#evidence"}
+              className={`rounded-full px-3 py-2 transition hover:bg-sky-400/10 hover:text-sky-200 ${index === 1 ? "bg-sky-400/10 text-sky-200 ring-1 ring-sky-400/20" : "text-slate-300"}`}
+            >
+              {item}
+            </a>
+          ))}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="mr-2 text-xs font-bold uppercase tracking-[0.28em] text-slate-500">Support</span>
+          {supportItems.map((item) => (
+            <a key={item} href="#evidence" className="rounded-full px-3 py-2 text-slate-300 transition hover:bg-sky-400/10 hover:text-sky-200">
+              {item}
+            </a>
+          ))}
+        </div>
+      </nav>
+    </header>
   );
 }
 
@@ -368,17 +308,17 @@ function StatusPanel({ audit }: { audit?: AuditResponse }) {
     <div className="rounded-3xl border border-slate-700/60 bg-slate-950/75 p-6">
       <div className="mb-6 flex items-center justify-between border-b border-slate-800 pb-4">
         <div>
-          <p className="text-xs uppercase tracking-[0.28em] text-slate-500">ASZ Decision Contract</p>
+          <p className="text-xs uppercase tracking-[0.28em] text-slate-500">Trust operations rule</p>
           <h3 className="mt-1 text-lg font-semibold text-white">Verified ≠ Authorized</h3>
         </div>
         <span className="rounded-full bg-amber-300/10 px-3 py-1 text-xs font-semibold text-amber-200">OPA REQUIRED</span>
       </div>
       <div className="space-y-3">
         {[
-          ["Trust registry", "ATLAS eligibility required", "text-sky-300"],
-          ["Signature", "CIPHER integrity required", "text-sky-300"],
+          ["ATLAS registry", "Eligibility checked", "text-sky-300"],
+          ["CIPHER signature", "Integrity verified", "text-sky-300"],
           ["Audit chain", audit?.chain_verified ? "Verified" : "Pending data", audit?.chain_verified ? "text-emerald-300" : "text-amber-300"],
-          ["Runtime", "Forward to local OPA only", "text-amber-300"],
+          ["Sentinel handoff", "Local OPA remains final", "text-amber-300"],
         ].map(([label, value, color]) => (
           <div key={label} className="flex items-center justify-between rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-3 text-sm">
             <span className="text-slate-400">{label}</span>
@@ -387,9 +327,146 @@ function StatusPanel({ audit }: { audit?: AuditResponse }) {
         ))}
       </div>
       <div className="mt-5 rounded-2xl border border-amber-300/20 bg-amber-300/10 p-4 text-sm leading-6 text-amber-100">
-        Verified for local OPA evaluation — not execution approval.
+        ASZ verified context may be handed to Sentinel/Kubernetes. Sentinel/OPA remains the local enforcement authority.
       </div>
     </div>
+  );
+}
+
+function Hero({ audit }: { audit?: AuditResponse }) {
+  return (
+    <section id="overview" className="relative overflow-hidden px-6 pb-14 pt-10 md:pb-16 md:pt-12">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_20%,rgba(56,189,248,0.18),transparent_34%),radial-gradient(circle_at_80%_30%,rgba(37,99,235,0.14),transparent_32%)]" />
+      <div className="relative mx-auto grid max-w-7xl gap-6">
+        <div className="rounded-[1.75rem] border border-sky-400/20 bg-[#10243f]/80 p-6 shadow-2xl shadow-black/20 md:p-8 lg:p-10">
+          <p className="mb-6 text-xs font-bold uppercase tracking-[0.28em] text-slate-400">Platform Overview</p>
+          <div className="grid gap-8 lg:grid-cols-[1fr_0.42fr] lg:items-end">
+            <div>
+              <Badge>Agent Sovereignty Zones Command Center</Badge>
+              <h1 className="mt-7 text-4xl font-black leading-[1.02] tracking-[-0.05em] text-white md:text-6xl lg:text-7xl">
+                ASZ Trust Operations Platform
+              </h1>
+              <p className="mt-6 max-w-4xl text-base leading-8 text-slate-300 md:text-xl">
+                Operate cross-zone agent trust with signed assertions, deterministic failure explanations, tamper-evident audit history, and local enforcement handoff visibility.
+              </p>
+            </div>
+            <div className="rounded-3xl border border-slate-700/60 bg-slate-950/60 p-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Command Rule</p>
+              <p className="mt-3 text-2xl font-black text-white">Verified ≠ Authorized</p>
+              <p className="mt-3 text-sm leading-6 text-slate-400">
+                ASZ provides verified handoff context. Sentinel/OPA remains the receiving-zone decision authority.
+              </p>
+            </div>
+          </div>
+          <div className="mt-8 flex flex-col justify-between gap-6 border-t border-slate-700/70 pt-6 lg:flex-row lg:items-center">
+            <CTAButtons />
+            <div className="grid gap-3 text-sm leading-6 text-slate-300 sm:grid-cols-3 lg:max-w-3xl">
+              <div className="rounded-2xl border border-slate-700/60 bg-slate-950/50 p-4">
+                <Fingerprint className="mb-3 h-5 w-5 text-cyan-300" />
+                Signed assertions cross zones as evidence, not execution approval.
+              </div>
+              <div className="rounded-2xl border border-slate-700/60 bg-slate-950/50 p-4">
+                <KeyRound className="mb-3 h-5 w-5 text-sky-300" />
+                Trust, signature, replay, and DDR proof remain independently inspectable.
+              </div>
+              <div className="rounded-2xl border border-slate-700/60 bg-slate-950/50 p-4">
+                <LockKeyhole className="mb-3 h-5 w-5 text-amber-300" />
+                Local OPA remains required before any receiving-zone action proceeds.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <StatusPanel audit={audit} />
+      </div>
+    </section>
+  );
+}
+
+function isRejectedEvent(event: ZoneEvent) {
+  return (
+    event.outcome === "rejected" ||
+    event.outcome === "DENY" ||
+    event.outcome === "INVALID" ||
+    Boolean(event.reason_code?.includes("SIGNATURE") || event.reason_code?.includes("REPLAY"))
+  );
+}
+
+function TrustPostureSummary({ state }: { state: DashboardState }) {
+  const zones = Object.values(state.registry?.zones || {});
+  const trustedZones = zones.filter((zone) => zone.status === "trusted").length;
+  const events = state.events?.events || [];
+  const rejectedHandoffs = events.filter(isRejectedEvent).length;
+  const auditVerified = state.audit?.chain_verified === true;
+  const tamperDetected = state.tamperDemo?.tampered_chain_verified === false;
+
+  const cards = [
+    {
+      icon: Globe2,
+      label: "Trusted Zones",
+      value: `${trustedZones}/${state.registry?.count ?? zones.length}`,
+      detail: "ATLAS registry entries currently marked trusted.",
+    },
+    {
+      icon: Network,
+      label: "Live Events",
+      value: `${state.events?.count ?? events.length}`,
+      detail: "Cross-zone records loaded from the backend evidence stream.",
+    },
+    {
+      icon: GitBranch,
+      label: "Audit Chain",
+      value: auditVerified ? "Verified" : "Pending",
+      detail: auditVerified ? "Latest hash chain verification is passing." : "Waiting for audit data or backend verification.",
+    },
+    {
+      icon: XCircle,
+      label: "Rejected Handoffs",
+      value: `${rejectedHandoffs}`,
+      detail: "Derived from rejected, invalid, deny, signature, and replay evidence.",
+    },
+    {
+      icon: AlertTriangle,
+      label: "Tamper Proof",
+      value: tamperDetected ? "Detected" : "Pending",
+      detail: tamperDetected ? "Cloned-chain tamper simulation breaks as expected." : "Safe simulation has not returned tamper evidence yet.",
+    },
+    {
+      icon: LockKeyhole,
+      label: "Local OPA Required",
+      value: "Required",
+      detail: "Verified handoff context still goes to local Sentinel/OPA evaluation.",
+    },
+  ];
+
+  return (
+    <section className="border-y border-slate-800/80 bg-[#07101d] px-6 py-12">
+      <div className="mx-auto max-w-7xl">
+        <div className="mb-6 flex flex-col justify-between gap-3 rounded-[1.75rem] border border-sky-400/20 bg-[#10243f]/70 p-6 md:flex-row md:items-end">
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.28em] text-sky-300">Trust posture summary</p>
+            <h2 className="text-2xl font-bold tracking-tight text-white md:text-4xl">Executive Trust Posture</h2>
+          </div>
+          <p className="max-w-2xl text-sm leading-6 text-slate-400">
+            A compact operations view of trust registry state, evidence volume, audit integrity, rejection proof, tamper evidence, and local enforcement posture.
+          </p>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+          {cards.map(({ icon: Icon, label, value, detail }) => (
+            <div key={label} className="rounded-3xl border border-sky-400/20 bg-[#10243f]/75 p-5 shadow-xl shadow-black/10">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-sky-300/20 bg-sky-300/10 text-sky-300">
+                  <Icon className="h-5 w-5" />
+                </div>
+                <span className="text-right text-2xl font-bold text-white">{value}</span>
+              </div>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{label}</p>
+              <p className="mt-3 text-xs leading-5 text-slate-400">{detail}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -450,18 +527,18 @@ function HandshakeSimulator({ onComplete }: { onComplete: () => Promise<void> })
   }
 
   return (
-    <section className="border-y border-slate-800/80 bg-[#05070d] px-6 py-20">
+    <section id="handshake" className="border-y border-slate-800/80 bg-[#05070d] px-6 py-20">
       <div className="mx-auto max-w-7xl">
         <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-end">
           <div>
             <p className="mb-3 text-xs font-semibold uppercase tracking-[0.28em] text-sky-300">
-              Live handshake simulator
+              Handshake simulator
             </p>
             <h2 className="text-3xl font-bold tracking-tight text-white md:text-5xl">
-              Generate Cross-Zone Activity
+              Run Cross-Zone Handshake
             </h2>
             <p className="mt-4 max-w-3xl text-base leading-8 text-slate-300">
-              Create a signed outbound assertion, submit it to the inbound verifier, then refresh events, DDR explanations, and the audit chain.
+              Create a signed outbound assertion, submit it to the inbound verifier, then refresh the live evidence panels without clearing audit history.
             </p>
           </div>
           <div className="rounded-full border border-amber-300/20 bg-amber-300/10 px-4 py-2 text-xs font-semibold text-amber-200">
@@ -517,7 +594,7 @@ function HandshakeSimulator({ onComplete }: { onComplete: () => Promise<void> })
                   value={scopeText}
                   onChange={(event) => setScopeText(event.target.value)}
                   className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-white outline-none focus:border-sky-300"
-                  placeholder="zone:handoff, agent:execute"
+                  placeholder="zone:handoff, evidence:read"
                 />
               </label>
             </div>
@@ -596,6 +673,38 @@ function HandshakeSimulator({ onComplete }: { onComplete: () => Promise<void> })
   );
 }
 
+function PanelHeader({ eyebrow, title, meta }: { eyebrow: string; title: string; meta?: React.ReactNode }) {
+  return (
+    <div className="mb-4 flex flex-col justify-between gap-3 md:flex-row md:items-center">
+      <div>
+        <p className="mb-2 text-xs font-semibold uppercase tracking-[0.22em] text-sky-300">{eyebrow}</p>
+        <h3 className="text-lg font-semibold text-white">{title}</h3>
+      </div>
+      {meta ? <div>{meta}</div> : null}
+    </div>
+  );
+}
+
+function PlaceholderPanel({ icon: Icon, title, body }: { icon: any; title: string; body: string }) {
+  return (
+    <div className="rounded-3xl border border-slate-700/60 bg-slate-950/70 p-5">
+      <div className="mb-4 flex items-center gap-3">
+        <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-cyan-300/20 bg-cyan-300/10 text-cyan-200">
+          <Icon className="h-5 w-5" />
+        </div>
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Preview</p>
+          <h3 className="text-lg font-semibold text-white">{title}</h3>
+        </div>
+      </div>
+      <p className="text-sm leading-6 text-slate-300">{body}</p>
+      <div className="mt-5 rounded-2xl border border-dashed border-slate-700 p-4 text-xs leading-5 text-slate-500">
+        Placeholder only. No new backend endpoint is called from this shell.
+      </div>
+    </div>
+  );
+}
+
 function DataPanel({ state, loading, error, onRefresh }: { state: DashboardState; loading: boolean; error: string | null; onRefresh: () => void | Promise<void> }) {
   const zones = useMemo(() => Object.values(state.registry?.zones || {}), [state.registry]);
   const events = state.events?.events || [];
@@ -633,14 +742,14 @@ function DataPanel({ state, loading, error, onRefresh }: { state: DashboardState
   }
 
   return (
-    <section className="border-y border-slate-800/80 bg-[#080b14] px-6 py-24 md:py-32">
+    <section id="evidence" className="border-y border-slate-800/80 bg-[#080b14] px-6 py-20 md:py-28">
       <div className="mx-auto max-w-7xl">
         <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-end">
           <div>
             <p className="mb-3 text-xs font-semibold uppercase tracking-[0.28em] text-sky-300">Live backend visibility</p>
-            <h2 className="text-3xl font-bold tracking-tight text-white md:text-5xl">ASZ Control Evidence</h2>
+            <h2 className="text-3xl font-bold tracking-tight text-white md:text-5xl">Trust Evidence Command Center</h2>
             <p className="mt-4 max-w-3xl text-base leading-8 text-slate-300">
-              These panels read directly from the Agent Sovereignty Zones backend. They show trust registry state, events, audit proof, and deterministic DDR explanations.
+              Operational evidence from the Agent Sovereignty Zones backend: registry posture, cross-zone events, hash-linked audit proof, DDR explanations, safe tamper simulation, and deterministic failure evidence.
             </p>
           </div>
           <button
@@ -662,10 +771,11 @@ function DataPanel({ state, loading, error, onRefresh }: { state: DashboardState
 
         <div className="grid gap-5 lg:grid-cols-2">
           <div className="rounded-3xl border border-slate-700/60 bg-slate-950/70 p-5">
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-white">Zone Registry</h3>
-              <span className="text-xs text-slate-500">{state.registry?.count ?? 0} zones</span>
-            </div>
+            <PanelHeader
+              eyebrow="Registry"
+              title="Zone Registry"
+              meta={<span className="text-xs text-slate-500">{state.registry?.count ?? 0} zones</span>}
+            />
             <div className="space-y-3">
               {zones.length ? zones.map((zone) => (
                 <div key={zone.zone_id} className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
@@ -684,26 +794,32 @@ function DataPanel({ state, loading, error, onRefresh }: { state: DashboardState
           </div>
 
           <div className="rounded-3xl border border-slate-700/60 bg-slate-950/70 p-5">
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-white">Cross-Zone Events</h3>
-              <span className="text-xs text-slate-500">
-                {events.length > visibleEvents.length
-                  ? `Showing latest ${visibleEvents.length} of ${events.length} events`
-                  : `${state.events?.count ?? 0} events`}
-              </span>
-            </div>
+            <PanelHeader
+              eyebrow="Activity"
+              title="Cross-Zone Events"
+              meta={(
+                <span className="text-xs text-slate-500">
+                  {events.length > visibleEvents.length
+                    ? `Showing latest ${visibleEvents.length} of ${events.length} events`
+                    : `${state.events?.count ?? 0} events`}
+                </span>
+              )}
+            />
             <div className="space-y-3">
               {visibleEvents.length ? visibleEvents.map((event) => <EventRow key={event.event_id} event={event} />) : <Empty label="No events returned" />}
             </div>
           </div>
 
           <div className="rounded-3xl border border-slate-700/60 bg-slate-950/70 p-5">
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-white">Dual-Zone Audit Chain</h3>
-              <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${state.audit?.chain_verified ? statusClass("accepted") : statusClass("created")}`}>
-                {state.audit?.chain_verified ? "Verified" : "Pending"}
-              </span>
-            </div>
+            <PanelHeader
+              eyebrow="Audit integrity"
+              title="Dual-Zone Audit Chain"
+              meta={(
+                <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${state.audit?.chain_verified ? statusClass("accepted") : statusClass("created")}`}>
+                  {state.audit?.chain_verified ? "Verified" : "Pending"}
+                </span>
+              )}
+            />
             <div className="mb-4 rounded-2xl border border-slate-800 bg-slate-900/70 p-4 text-xs text-slate-400">
               Latest hash: <span className="font-mono text-slate-200">{shortHash(state.audit?.latest_hash)}</span>
               <p className="mt-2 text-slate-500">
@@ -718,14 +834,17 @@ function DataPanel({ state, loading, error, onRefresh }: { state: DashboardState
           </div>
 
           <div className="rounded-3xl border border-slate-700/60 bg-slate-950/70 p-5">
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-white">DDR Explanations</h3>
-              <span className="text-xs text-slate-500">
-                {explanations.length > visibleExplanations.length
-                  ? `Showing latest ${visibleExplanations.length} of ${explanations.length} explanations`
-                  : `${state.explanations?.count ?? 0} explanations`}
-              </span>
-            </div>
+            <PanelHeader
+              eyebrow="Deterministic decision record"
+              title="DDR Explanations"
+              meta={(
+                <span className="text-xs text-slate-500">
+                  {explanations.length > visibleExplanations.length
+                    ? `Showing latest ${visibleExplanations.length} of ${explanations.length} explanations`
+                    : `${state.explanations?.count ?? 0} explanations`}
+                </span>
+              )}
+            />
             <div className="space-y-3">
               {visibleExplanations.length ? visibleExplanations.map((item, index) => <ExplanationRow key={`${item.reason_code}-${index}`} item={item} />) : <Empty label="No explanations returned" />}
             </div>
@@ -800,7 +919,7 @@ function DataPanel({ state, loading, error, onRefresh }: { state: DashboardState
                 </div>
                 <p className="max-w-4xl text-sm leading-6 text-amber-100/75">
                   Valid assertions can cross zones. Invalid assertions fail closed before local OPA.
-                  ASZ records the rejection, explains the reason, and grants no execution authority.
+                  ASZ records the rejection, explains the reason, and produces no runtime grant.
                 </p>
               </div>
               <span className="rounded-full border border-amber-400/30 bg-amber-400/10 px-3 py-1 text-xs font-semibold text-amber-200">
@@ -891,7 +1010,7 @@ function DataPanel({ state, loading, error, onRefresh }: { state: DashboardState
                     <p className="mt-1 font-semibold text-rose-200">{failureResult.local_opa_handoff ? "Yes" : "No"}</p>
                   </div>
                   <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3">
-                    <p className="text-slate-500">Authorization granted</p>
+                    <p className="text-slate-500">Runtime grant</p>
                     <p className="mt-1 font-semibold text-rose-200">{failureResult.authorization_granted ? "Yes" : "No"}</p>
                   </div>
                   <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3">
@@ -901,7 +1020,7 @@ function DataPanel({ state, loading, error, onRefresh }: { state: DashboardState
                 </div>
 
                 <p className="mt-4 text-slate-500">
-                  Failure demos write rejection evidence to the audit chain. They do not corrupt Redis, mutate the trust registry, create sessions, or authorize execution.
+                  Failure demos write rejection evidence to the audit chain. They do not corrupt Redis, mutate the trust registry, create sessions, or create runtime grants.
                 </p>
               </div>
             ) : (
@@ -910,12 +1029,23 @@ function DataPanel({ state, loading, error, onRefresh }: { state: DashboardState
               </div>
             )}
           </div>
+
+          <PlaceholderPanel
+            icon={ServerCog}
+            title="Kubernetes/Sentinel Handoff"
+            body="ASZ can provide verified handoff context to Sentinel. Sentinel still evaluates the local Kubernetes action with OPA as the decision authority."
+          />
+
+          <PlaceholderPanel
+            icon={FileCheck2}
+            title="Evidence Export"
+            body="Future evidence bundles will package assertion details, DDR explanations, audit anchors, failure evidence, and handoff correlation without exposing secrets, tokens, or private keys."
+          />
         </div>
       </div>
     </section>
   );
 }
-
 function Empty({ label }: { label: string }) {
   return <div className="rounded-2xl border border-dashed border-slate-700 p-5 text-sm text-slate-500">{label}</div>;
 }
@@ -959,6 +1089,7 @@ function ExplanationRow({ item }: { item: Explanation }) {
   );
 }
 
+
 export default function AgentSovereigntyZonesPage() {
   const [state, setState] = useState<DashboardState>({});
   const [loading, setLoading] = useState(false);
@@ -989,108 +1120,19 @@ export default function AgentSovereigntyZonesPage() {
 
   return (
     <main className="min-h-screen bg-[#05070d] text-slate-100">
-      <section className="relative overflow-hidden px-6 pb-24 pt-28 md:pb-32 md:pt-40">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_20%,rgba(56,189,248,0.17),transparent_35%),radial-gradient(circle_at_78%_35%,rgba(37,99,235,0.16),transparent_34%)]" />
-        <div className="relative mx-auto grid max-w-7xl items-center gap-12 lg:grid-cols-[0.9fr_1.1fr]">
-          <div>
-            <Badge>Agent Sovereignty Zones</Badge>
-            <h1 className="mt-7 text-5xl font-bold leading-[1.05] tracking-[-0.04em] text-white md:text-7xl">
-              Cross-Domain Trust for Autonomous Agents
-            </h1>
-            <p className="mt-7 max-w-2xl text-lg leading-8 text-slate-300 md:text-xl">
-              Let independent organizations run their own SecureTheCloud governance domains while safely allowing trusted AI agents to interact across boundaries through signed assertions, local re-evaluation, deterministic explanations, and dual-zone audit anchoring.
-            </p>
-            <div className="mt-9"><CTAButtons /></div>
-            <p className="mt-6 max-w-xl text-sm leading-6 text-slate-400">
-              Built on SecureTheCloud Aegis Runtime. DDR is embedded. OPA remains final. No foreign zone can authorize execution inside another zone.
-            </p>
-          </div>
-          <StatusPanel audit={state.audit} />
-        </div>
-      </section>
-
+      <ShellHeader connected={!error && Boolean(state.registry || state.events || state.audit)} />
+      <Hero audit={state.audit} />
+      <TrustPostureSummary state={state} />
       <HandshakeSimulator onComplete={loadDashboard} />
-
       <DataPanel state={state} loading={loading} error={error} onRefresh={loadDashboard} />
-
-      <section className="border-y border-slate-800/80 bg-[#080b14] px-6 py-24 md:py-32">
-        <div className="mx-auto max-w-7xl">
-          <SectionHeader
-            eyebrow="Why it matters"
-            title="Autonomous Agents Will Cross Organizational Boundaries"
-            body="Enterprises need AI agents to collaborate with vendors, partners, cloud platforms, and regulated systems. Agent Sovereignty Zones makes those interactions verifiable without requiring shared infrastructure or implicit trust."
-          />
-          <div className="grid gap-5 md:grid-cols-3">
-            <Card icon={AlertTriangle} title="No Shared Governance" body="Every organization has different policy, risk, identity, and audit requirements." />
-            <Card icon={Network} title="No Implicit Trust" body="Foreign agents can present evidence, but the receiving zone must verify independently." />
-            <Card icon={Database} title="No Unprovable Actions" body="Cross-zone activity can be explained and anchored into deterministic audit history." />
-          </div>
-        </div>
-      </section>
-
-      <section className="px-6 py-24 md:py-32">
-        <div className="mx-auto max-w-7xl">
-          <SectionHeader
-            eyebrow="Architecture"
-            title="Each Zone Is Sovereign. Every Interaction Is Verified."
-            body="A foreign zone can provide signed context, but the receiving zone owns final authority. Verified assertions are forwarded to local runtime evaluation — not treated as execution approval."
-          />
-          <ZoneDiagram />
-        </div>
-      </section>
-
-      <section className="border-y border-slate-800/80 bg-[#080b14] px-6 py-24 md:py-32">
-        <div className="mx-auto max-w-7xl">
-          <SectionHeader eyebrow="Validation path" title="The Cross-Zone Handshake" />
-          <div className="grid gap-4 md:grid-cols-6">
-            {handshakeSteps.map((step, index) => (
-              <div key={step} className="relative rounded-3xl border border-slate-700/60 bg-slate-950/60 p-5 text-center">
-                <p className="mx-auto mb-3 flex h-8 w-8 items-center justify-center rounded-full bg-sky-300/10 text-sm font-bold text-sky-300">
-                  {index + 1}
-                </p>
-                <p className="text-sm font-semibold text-white">{step}</p>
-                {index < handshakeSteps.length - 1 ? <ArrowRight className="absolute -right-3 top-1/2 hidden h-5 w-5 -translate-y-1/2 text-slate-600 md:block" /> : null}
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="px-6 py-24 md:py-32">
-        <div className="mx-auto max-w-7xl">
-          <SectionHeader
-            eyebrow="Capabilities"
-            title="Built on the Aegis Runtime Baseline"
-            body="Agent Sovereignty Zones extends the existing runtime with protocol-level trust, not a second authorization system. The local runtime still owns final execution decisions."
-          />
-          <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-            {productPillars.map((pillar) => <Card key={pillar.title} {...pillar} />)}
-          </div>
-        </div>
-      </section>
-
-      <section className="border-y border-slate-800/80 bg-[#080b14] px-6 py-24 md:py-32">
-        <div className="mx-auto max-w-7xl">
-          <SectionHeader eyebrow="Use cases" title="Where Agent Sovereignty Zones Fits" />
-          <div className="grid gap-4 md:grid-cols-2">
-            {useCases.map((item) => (
-              <div key={item} className="flex items-start gap-3 rounded-3xl border border-slate-700/50 bg-slate-900/50 p-5">
-                <CheckCircle2 className="mt-1 h-5 w-5 shrink-0 text-sky-300" />
-                <p className="text-sm leading-7 text-slate-200">{item}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="px-6 py-24 md:py-32">
+      <section className="px-6 py-20 md:py-28">
         <div className="mx-auto max-w-5xl rounded-[2rem] border border-sky-300/20 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.18),transparent_38%),#07101d] p-8 text-center md:p-14">
           <Layers3 className="mx-auto mb-6 h-10 w-10 text-sky-300" />
           <h2 className="text-4xl font-bold tracking-tight text-white md:text-6xl">
-            Build Cross-Domain Trust Before Agents Cross Boundaries
+            Trust Operations for Cross-Zone Agent Governance
           </h2>
           <p className="mx-auto mt-6 max-w-3xl text-lg leading-8 text-slate-300">
-            Request a private technical demo and see how Agent Sovereignty Zones extends SecureTheCloud Aegis Runtime into cryptographically verifiable cross-organization governance.
+            Use this command center to demonstrate live handshakes, rejection proof, deterministic explanations, audit integrity, and local enforcement handoff visibility without changing backend behavior.
           </p>
           <div className="mt-9 flex justify-center"><CTAButtons /></div>
         </div>

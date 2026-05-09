@@ -110,6 +110,65 @@ type ExplanationsResponse = {
   explanations: Explanation[];
 };
 
+type CorrelationAuditAnchor = {
+  event_id: string;
+  event_hash: string;
+  previous_hash: string;
+};
+
+type CorrelationASZEvidence = {
+  verified: boolean;
+  status: string;
+  origin_zone: string;
+  destination_zone: string;
+  principal?: string | null;
+  intent?: string | null;
+  audit_anchor: CorrelationAuditAnchor;
+};
+
+type CorrelationSentinelEvidence = {
+  evidence_available: boolean;
+  status: "pending_sentinel_evidence" | "sentinel_evidence_unavailable" | "sentinel_evidence_available" | string;
+  decision_authority: "OPA" | string;
+  authorization_status: "requires_local_opa_decision" | string;
+  outcome?: "ALLOW" | "DENY" | "REVIEW" | null;
+  reason_code?: string | null;
+};
+
+type CorrelationProof = {
+  opa_authority_preserved: true;
+  asz_authorization_bypass: false;
+  authorization_granted_by_asz: false;
+  redis_authorization_source: false;
+  runtime_artifacts_emitted: false;
+};
+
+type KubernetesCorrelationResponse = {
+  read_only: true;
+  correlation_type: "asz_kubernetes_sentinel" | string;
+  generated_at: string;
+  tenant_id?: string | null;
+  source: "asz_backend" | string;
+  found: boolean;
+  reason_code?: "asz_evidence_not_found" | "sentinel_evidence_unavailable" | string | null;
+  assertion_id: string;
+  asz_handoff_id?: string | null;
+  asz?: CorrelationASZEvidence | null;
+  sentinel: CorrelationSentinelEvidence;
+  proof: CorrelationProof;
+};
+
+type KubernetesCorrelationSummaryResponse = {
+  read_only: true;
+  correlation_type: "asz_kubernetes_sentinel" | string;
+  generated_at: string;
+  tenant_id?: string | null;
+  source: "asz_backend" | string;
+  count: number;
+  correlations: KubernetesCorrelationResponse[];
+  proof: CorrelationProof;
+};
+
 type OutboundHandshakeResponse = {
   status: "assertion_created" | string;
   assertion_id: string;
@@ -146,11 +205,13 @@ type DashboardState = {
   audit?: AuditResponse;
   tamperDemo?: TamperDemoResponse;
   explanations?: ExplanationsResponse;
+  correlationSummary?: KubernetesCorrelationSummaryResponse;
 };
 
 const EVENTS_VISIBLE_LIMIT = 6;
 const AUDIT_VISIBLE_LIMIT = 6;
 const EXPLANATIONS_VISIBLE_LIMIT = 5;
+const CORRELATIONS_VISIBLE_LIMIT = 4;
 
 const API_BASE = process.env.NEXT_PUBLIC_ASZ_API_BASE_URL || "";
 const API_KEY = process.env.NEXT_PUBLIC_ASZ_TENANT_API_KEY || "";
@@ -210,18 +271,24 @@ function shortHash(value?: string | null) {
 }
 
 function statusClass(status?: string) {
-  if (status === "trusted" || status === "accepted" || status === "ALLOW") return "text-emerald-300 bg-emerald-400/10 border-emerald-400/20";
-  if (status === "suspended" || status === "created") return "text-amber-300 bg-amber-400/10 border-amber-400/20";
+  if (status === "trusted" || status === "accepted" || status === "ALLOW" || status === "verified_requires_local_opa_decision") return "text-emerald-300 bg-emerald-400/10 border-emerald-400/20";
+  if (status === "suspended" || status === "created" || status === "pending_sentinel_evidence" || status === "sentinel_evidence_unavailable") return "text-amber-300 bg-amber-400/10 border-amber-400/20";
   if (status === "revoked" || status === "rejected" || status === "DENY" || status === "INVALID") return "text-rose-300 bg-rose-400/10 border-rose-400/20";
   return "text-sky-300 bg-sky-400/10 border-sky-400/20";
 }
 
-function Badge({ children }: { children: React.ReactNode }) {
+function Badge({ children }: { children?: React.ReactNode }) {
   return (
     <span className="inline-flex rounded-full border border-cyan-300/30 bg-cyan-300/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-cyan-200">
       {children}
     </span>
   );
+}
+
+function YesNoPill({ value, positive = true }: { value: boolean; positive?: boolean }) {
+  const text = value ? "True" : "False";
+  const cls = value === positive ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-200" : "border-rose-400/30 bg-rose-400/10 text-rose-200";
+  return <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${cls}`}>{text}</span>;
 }
 
 function CTAButtons() {
@@ -399,6 +466,7 @@ function TrustPostureSummary({ state }: { state: DashboardState }) {
   const rejectedHandoffs = events.filter(isRejectedEvent).length;
   const auditVerified = state.audit?.chain_verified === true;
   const tamperDetected = state.tamperDemo?.tampered_chain_verified === false;
+  const latestCorrelation = latestCorrelationFromSummary(state.correlationSummary);
 
   const cards = [
     {
@@ -432,10 +500,10 @@ function TrustPostureSummary({ state }: { state: DashboardState }) {
       detail: tamperDetected ? "Cloned-chain tamper simulation breaks as expected." : "Safe simulation has not returned tamper evidence yet.",
     },
     {
-      icon: LockKeyhole,
-      label: "Local OPA Required",
-      value: "Required",
-      detail: "Verified handoff context still goes to local Sentinel/OPA evaluation.",
+      icon: ServerCog,
+      label: "K8s Correlation",
+      value: latestCorrelation?.sentinel.status === "sentinel_evidence_available" ? "Available" : "Pending",
+      detail: "Correlation is evidence-only. ASZ does not authorize Kubernetes execution.",
     },
   ];
 
@@ -705,16 +773,23 @@ function PlaceholderPanel({ icon: Icon, title, body }: { icon: any; title: strin
   );
 }
 
+function latestCorrelationFromSummary(summary?: KubernetesCorrelationSummaryResponse) {
+  const correlations = summary?.correlations || [];
+  return correlations.length ? correlations[correlations.length - 1] : undefined;
+}
+
 function DataPanel({ state, loading, error, onRefresh }: { state: DashboardState; loading: boolean; error: string | null; onRefresh: () => void | Promise<void> }) {
   const zones = useMemo(() => Object.values(state.registry?.zones || {}), [state.registry]);
   const events = state.events?.events || [];
   const auditEvents = state.audit?.events || [];
   const tamperDemo = state.tamperDemo;
   const explanations = state.explanations?.explanations || [];
+  const correlations = state.correlationSummary?.correlations || [];
 
   const visibleEvents = events.slice(-EVENTS_VISIBLE_LIMIT).reverse();
   const visibleAuditEvents = auditEvents.slice(-AUDIT_VISIBLE_LIMIT).reverse();
   const visibleExplanations = explanations.slice(-EXPLANATIONS_VISIBLE_LIMIT).reverse();
+  const visibleCorrelations = correlations.slice(-CORRELATIONS_VISIBLE_LIMIT).reverse();
 
   const [failureRunning, setFailureRunning] = useState<FailureDemoScenario | null>(null);
   const [failureResult, setFailureResult] = useState<FailureDemoResponse | null>(null);
@@ -749,7 +824,7 @@ function DataPanel({ state, loading, error, onRefresh }: { state: DashboardState
             <p className="mb-3 text-xs font-semibold uppercase tracking-[0.28em] text-sky-300">Live backend visibility</p>
             <h2 className="text-3xl font-bold tracking-tight text-white md:text-5xl">Trust Evidence Command Center</h2>
             <p className="mt-4 max-w-3xl text-base leading-8 text-slate-300">
-              Operational evidence from the Agent Sovereignty Zones backend: registry posture, cross-zone events, hash-linked audit proof, DDR explanations, safe tamper simulation, and deterministic failure evidence.
+              Operational evidence from the Agent Sovereignty Zones backend: registry posture, cross-zone events, hash-linked audit proof, DDR explanations, safe tamper simulation, deterministic failure evidence, and Kubernetes/Sentinel correlation.
             </p>
           </div>
           <button
@@ -849,6 +924,11 @@ function DataPanel({ state, loading, error, onRefresh }: { state: DashboardState
               {visibleExplanations.length ? visibleExplanations.map((item, index) => <ExplanationRow key={`${item.reason_code}-${index}`} item={item} />) : <Empty label="No explanations returned" />}
             </div>
           </div>
+
+          <KubernetesSentinelCorrelationPanel
+            summary={state.correlationSummary}
+            visibleCorrelations={visibleCorrelations}
+          />
 
           <div className="rounded-3xl border border-rose-400/30 bg-rose-950/30 p-5 lg:col-span-2">
             <div className="mb-4 flex flex-col justify-between gap-3 md:flex-row md:items-center">
@@ -1031,12 +1111,6 @@ function DataPanel({ state, loading, error, onRefresh }: { state: DashboardState
           </div>
 
           <PlaceholderPanel
-            icon={ServerCog}
-            title="Kubernetes/Sentinel Handoff"
-            body="ASZ can provide verified handoff context to Sentinel. Sentinel still evaluates the local Kubernetes action with OPA as the decision authority."
-          />
-
-          <PlaceholderPanel
             icon={FileCheck2}
             title="Evidence Export"
             body="Future evidence bundles will package assertion details, DDR explanations, audit anchors, failure evidence, and handoff correlation without exposing secrets, tokens, or private keys."
@@ -1046,6 +1120,166 @@ function DataPanel({ state, loading, error, onRefresh }: { state: DashboardState
     </section>
   );
 }
+
+function KubernetesSentinelCorrelationPanel({
+  summary,
+  visibleCorrelations,
+}: {
+  summary?: KubernetesCorrelationSummaryResponse;
+  visibleCorrelations: KubernetesCorrelationResponse[];
+}) {
+  const latest = latestCorrelationFromSummary(summary);
+  const count = summary?.count ?? 0;
+
+  return (
+    <div className="rounded-3xl border border-cyan-300/30 bg-cyan-950/20 p-5 lg:col-span-2">
+      <PanelHeader
+        eyebrow="Kubernetes/Sentinel Handoff"
+        title="Live Correlation View"
+        meta={(
+          <span className="rounded-full border border-amber-300/20 bg-amber-300/10 px-3 py-1 text-xs font-semibold text-amber-200">
+            OPA authority preserved
+          </span>
+        )}
+      />
+
+      <div className="mb-5 rounded-2xl border border-amber-300/20 bg-amber-300/10 p-4 text-sm leading-6 text-amber-100">
+        ASZ can provide verified handoff context to Sentinel. Sentinel still evaluates the local Kubernetes action with OPA as the decision authority.
+        <span className="mt-2 block font-semibold">Correlation is evidence-only. ASZ does not authorize Kubernetes execution.</span>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+          <p className="text-xs uppercase tracking-[0.2em] text-slate-500">ASZ assertion verified</p>
+          <p className={`mt-2 text-sm font-semibold ${latest?.asz?.verified ? "text-emerald-300" : "text-amber-300"}`}>
+            {latest?.asz?.verified ? "Verified" : latest ? "Not verified" : "Pending evidence"}
+          </p>
+          <p className="mt-2 text-xs text-slate-500">{latest?.asz?.status || "No ASZ correlation record loaded"}</p>
+        </div>
+
+        <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+          <p className="text-xs uppercase tracking-[0.2em] text-slate-500">ASZ handoff context</p>
+          <p className={`mt-2 text-sm font-semibold ${latest?.asz_handoff_id ? "text-emerald-300" : "text-amber-300"}`}>
+            {latest?.asz_handoff_id ? "Available" : "Pending"}
+          </p>
+          <p className="mt-2 font-mono text-xs text-slate-500">{latest?.asz_handoff_id || "No asz_handoff_id in current evidence"}</p>
+        </div>
+
+        <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+          <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Sentinel evidence</p>
+          <p className={`mt-2 text-sm font-semibold ${latest?.sentinel.evidence_available ? "text-emerald-300" : "text-amber-300"}`}>
+            {latest?.sentinel.evidence_available ? "Available" : "Pending / unavailable"}
+          </p>
+          <p className="mt-2 text-xs text-slate-500">{latest?.sentinel.status || "pending_sentinel_evidence"}</p>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+        <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs uppercase tracking-[0.2em] text-slate-500">OPA authority preserved</p>
+            <YesNoPill value={latest?.proof.opa_authority_preserved ?? summary?.proof.opa_authority_preserved ?? true} />
+          </div>
+          <p className="mt-2 text-xs text-slate-400">Sentinel/OPA remains the local decision authority.</p>
+        </div>
+
+        <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs uppercase tracking-[0.2em] text-slate-500">ASZ authorization bypass</p>
+            <YesNoPill value={latest?.proof.asz_authorization_bypass ?? false} positive={false} />
+          </div>
+          <p className="mt-2 text-xs text-slate-400">The correlation proof keeps bypass false.</p>
+        </div>
+
+        <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs uppercase tracking-[0.2em] text-slate-500">ASZ authorization granted</p>
+            <YesNoPill value={latest?.proof.authorization_granted_by_asz ?? false} positive={false} />
+          </div>
+          <p className="mt-2 text-xs text-slate-400">ASZ evidence is not an execution approval.</p>
+        </div>
+
+        <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Redis authorization source</p>
+            <YesNoPill value={latest?.proof.redis_authorization_source ?? summary?.proof.redis_authorization_source ?? false} positive={false} />
+          </div>
+          <p className="mt-2 text-xs text-slate-400">Redis is persistence, not authorization authority.</p>
+        </div>
+
+        <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Runtime artifacts emitted</p>
+            <YesNoPill value={latest?.proof.runtime_artifacts_emitted ?? summary?.proof.runtime_artifacts_emitted ?? false} positive={false} />
+          </div>
+          <p className="mt-2 text-xs text-slate-400">Correlation does not issue tokens, sessions, or runtime grants.</p>
+        </div>
+      </div>
+
+      <div className="mt-5 rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Correlation records</p>
+            <p className="mt-1 text-sm font-semibold text-white">
+              {count > visibleCorrelations.length
+                ? `Showing latest ${visibleCorrelations.length} of ${count} correlations`
+                : `${count} correlations`}
+            </p>
+          </div>
+          <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${statusClass(latest?.sentinel.status || "pending_sentinel_evidence")}`}>
+            {latest?.sentinel.status || "pending_sentinel_evidence"}
+          </span>
+        </div>
+
+        <div className="space-y-3">
+          {visibleCorrelations.length ? visibleCorrelations.map((correlation) => (
+            <CorrelationRow key={correlation.assertion_id} correlation={correlation} />
+          )) : <Empty label="No Kubernetes/Sentinel correlation records returned" />}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CorrelationRow({ correlation }: { correlation: KubernetesCorrelationResponse }) {
+  return (
+    <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4 text-xs leading-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="font-semibold text-white">Assertion {shortHash(correlation.assertion_id)}</p>
+          <p className="mt-1 text-slate-500">
+            {correlation.asz?.origin_zone || "—"} → {correlation.asz?.destination_zone || "—"}
+          </p>
+        </div>
+        <span className={`rounded-full border px-3 py-1 font-semibold ${statusClass(correlation.sentinel.status)}`}>
+          {correlation.sentinel.status}
+        </span>
+      </div>
+
+      <div className="mt-3 grid gap-3 md:grid-cols-4">
+        <div>
+          <p className="uppercase tracking-[0.2em] text-slate-500">ASZ verified</p>
+          <p className={correlation.asz?.verified ? "font-semibold text-emerald-300" : "font-semibold text-amber-300"}>
+            {correlation.asz?.verified ? "true" : "false"}
+          </p>
+        </div>
+        <div>
+          <p className="uppercase tracking-[0.2em] text-slate-500">Sentinel outcome</p>
+          <p className="font-semibold text-slate-300">{correlation.sentinel.outcome || "not fabricated"}</p>
+        </div>
+        <div>
+          <p className="uppercase tracking-[0.2em] text-slate-500">Decision authority</p>
+          <p className="font-semibold text-amber-200">{correlation.sentinel.decision_authority}</p>
+        </div>
+        <div>
+          <p className="uppercase tracking-[0.2em] text-slate-500">Audit anchor</p>
+          <p className="font-mono text-slate-300">{shortHash(correlation.asz?.audit_anchor.event_id)}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Empty({ label }: { label: string }) {
   return <div className="rounded-2xl border border-dashed border-slate-700 p-5 text-sm text-slate-500">{label}</div>;
 }
@@ -1089,7 +1323,6 @@ function ExplanationRow({ item }: { item: Explanation }) {
   );
 }
 
-
 export default function AgentSovereigntyZonesPage() {
   const [state, setState] = useState<DashboardState>({});
   const [loading, setLoading] = useState(false);
@@ -1106,7 +1339,16 @@ export default function AgentSovereigntyZonesPage() {
         fetchJson<TamperDemoResponse>("/v1/zones/audit/tamper-demo"),
         fetchJson<ExplanationsResponse>("/v1/zones/explanations"),
       ]);
-      setState({ registry, events, audit, tamperDemo, explanations });
+
+      let correlationSummary: KubernetesCorrelationSummaryResponse | undefined;
+
+      try {
+        correlationSummary = await fetchJson<KubernetesCorrelationSummaryResponse>("/v1/zones/correlation/summary");
+      } catch {
+        correlationSummary = undefined;
+      }
+
+      setState({ registry, events, audit, tamperDemo, explanations, correlationSummary });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to load ASZ backend visibility.");
     } finally {

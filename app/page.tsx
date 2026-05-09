@@ -767,7 +767,7 @@ function PlaceholderPanel({ icon: Icon, title, body }: { icon: any; title: strin
       </div>
       <p className="text-sm leading-6 text-slate-300">{body}</p>
       <div className="mt-5 rounded-2xl border border-dashed border-slate-700 p-4 text-xs leading-5 text-slate-500">
-        Placeholder only. No new backend endpoint is called from this shell.
+        Read-only evidence export APIs are backend-ready. Frontend export actions remain disabled until explicitly enabled.
       </div>
     </div>
   );

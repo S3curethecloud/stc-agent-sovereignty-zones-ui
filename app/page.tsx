@@ -382,7 +382,7 @@ function StatusPanel({ audit }: { audit?: AuditResponse }) {
       </div>
       <div className="space-y-3">
         {[
-          ["ATLAS registry", "Eligibility checked", "text-sky-300"],
+          ["Trust registry", "Eligibility checked", "text-sky-300"],
           ["CIPHER signature", "Integrity verified", "text-sky-300"],
           ["Audit chain", audit?.chain_verified ? "Verified" : "Pending data", audit?.chain_verified ? "text-emerald-300" : "text-amber-300"],
           ["Sentinel handoff", "Local OPA remains final", "text-amber-300"],
@@ -473,7 +473,7 @@ function TrustPostureSummary({ state }: { state: DashboardState }) {
       icon: Globe2,
       label: "Trusted Zones",
       value: `${trustedZones}/${state.registry?.count ?? zones.length}`,
-      detail: "ATLAS registry entries currently marked trusted.",
+      detail: "Trust registry entries currently marked trusted.",
     },
     {
       icon: Network,

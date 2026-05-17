@@ -1136,6 +1136,8 @@ function DataPanel({ state, loading, error, onRefresh }: { state: DashboardState
             title="Evidence Export"
             body="Future evidence bundles will package assertion details, DDR explanations, audit anchors, failure evidence, and handoff correlation without exposing secrets, tokens, or private keys."
           />
+
+        <HandoffResolverEvidencePanel resolver={state.handoffResolver} />
         </div>
       </div>
     </section>
@@ -1461,7 +1463,6 @@ export default function AgentSovereigntyZonesPage() {
       <TrustPostureSummary state={state} />
       <HandshakeSimulator onComplete={loadDashboard} />
       <DataPanel state={state} loading={loading} error={error} onRefresh={loadDashboard} />
-      <HandoffResolverEvidencePanel resolver={state.handoffResolver} />
       <section className="px-6 py-20 md:py-28">
         <div className="mx-auto max-w-5xl rounded-[2rem] border border-sky-300/20 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.18),transparent_38%),#07101d] p-8 text-center md:p-14">
           <Layers3 className="mx-auto mb-6 h-10 w-10 text-sky-300" />

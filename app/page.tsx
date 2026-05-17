@@ -169,6 +169,26 @@ type KubernetesCorrelationSummaryResponse = {
   proof: CorrelationProof;
 };
 
+type HandoffResolverProof = {
+  authorization_granted_by_asz: false;
+  kubernetes_execution_authorized: false;
+  token_issued: false;
+  session_created: false;
+  redis_authorization_source: false;
+  sentinel_outcome_fabricated: false;
+  opa_result_fabricated: false;
+  agent_black_box_permission_granted: false;
+  runtime_artifacts_emitted: false;
+};
+
+type HandoffResolverResponse = {
+  resolved: boolean;
+  safe_context_available: boolean;
+  reason_code?: string | null;
+  handoff?: unknown | null;
+  proof: HandoffResolverProof;
+};
+
 type OutboundHandshakeResponse = {
   status: "assertion_created" | string;
   assertion_id: string;
@@ -206,6 +226,7 @@ type DashboardState = {
   tamperDemo?: TamperDemoResponse;
   explanations?: ExplanationsResponse;
   correlationSummary?: KubernetesCorrelationSummaryResponse;
+  handoffResolver?: HandoffResolverResponse;
 };
 
 const EVENTS_VISIBLE_LIMIT = 6;
@@ -1121,6 +1142,70 @@ function DataPanel({ state, loading, error, onRefresh }: { state: DashboardState
   );
 }
 
+
+function HandoffResolverEvidencePanel({
+  resolver,
+}: {
+  resolver?: HandoffResolverResponse;
+}) {
+  const proof = resolver?.proof;
+
+  const evidenceCell = (label: string, value: string) => (
+    <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+      <p className="text-xs uppercase tracking-[0.2em] text-slate-500">{label}</p>
+      <p className="mt-2 text-sm font-semibold text-white">{value}</p>
+    </div>
+  );
+
+  return (
+    <section className="rounded-3xl border border-slate-800 bg-slate-900/60 p-5 shadow-2xl shadow-black/20">
+      <PanelHeader
+        eyebrow="Handoff Resolver Evidence"
+        title="Read-only resolver evidence"
+        meta={
+          <span className="rounded-full border border-cyan-400/30 bg-cyan-400/10 px-3 py-1 text-xs font-semibold text-cyan-200">
+            Evidence-only
+          </span>
+        }
+      />
+
+      <p className="mt-4 text-sm leading-6 text-slate-300">
+        Resolver evidence is read-only. Resolver output is evidence-only.
+        Resolved does not mean authorized. Safe context available does not mean authorized.
+        ASZ does not authorize Kubernetes execution. Sentinel/OPA remains local decision authority.
+        Redis is persistence, not authorization.
+      </p>
+
+      {!resolver ? (
+        <p className="mt-4 rounded-2xl border border-slate-800 bg-slate-950/70 p-4 text-sm text-slate-400">
+          Resolver evidence unavailable. No authorization decision is inferred.
+        </p>
+      ) : (
+        <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {evidenceCell("Resolved", resolver.resolved ? "True" : "False")}
+          {evidenceCell("Safe context", resolver.safe_context_available ? "True" : "False")}
+          {evidenceCell("Reason", resolver.reason_code ?? "none")}
+          {evidenceCell("Handoff evidence", resolver.handoff ? "Present" : "Unavailable")}
+        </div>
+      )}
+
+      {proof && (
+        <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {evidenceCell("ASZ authorization granted", proof.authorization_granted_by_asz ? "True" : "False")}
+          {evidenceCell("Kubernetes execution authorized", proof.kubernetes_execution_authorized ? "True" : "False")}
+          {evidenceCell("Token issued", proof.token_issued ? "True" : "False")}
+          {evidenceCell("Session created", proof.session_created ? "True" : "False")}
+          {evidenceCell("Redis authorization source", proof.redis_authorization_source ? "True" : "False")}
+          {evidenceCell("Runtime artifacts emitted", proof.runtime_artifacts_emitted ? "True" : "False")}
+          {evidenceCell("Sentinel outcome fabricated", proof.sentinel_outcome_fabricated ? "True" : "False")}
+          {evidenceCell("OPA result fabricated", proof.opa_result_fabricated ? "True" : "False")}
+          {evidenceCell("Agent Black Box permission granted", proof.agent_black_box_permission_granted ? "True" : "False")}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function KubernetesSentinelCorrelationPanel({
   summary,
   visibleCorrelations,
@@ -1348,7 +1433,16 @@ export default function AgentSovereigntyZonesPage() {
         correlationSummary = undefined;
       }
 
-      setState({ registry, events, audit, tamperDemo, explanations, correlationSummary });
+      let handoffResolver: HandoffResolverResponse | undefined;
+      try {
+        handoffResolver = await fetchJson<HandoffResolverResponse>(
+          "/v1/zones/handoff-resolver/demo-handoff?destination_zone=zone-b&requested_by=asz-frontend"
+        );
+      } catch {
+        handoffResolver = undefined;
+      }
+
+      setState({ registry, events, audit, tamperDemo, explanations, correlationSummary, handoffResolver });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to load ASZ backend visibility.");
     } finally {
@@ -1367,6 +1461,7 @@ export default function AgentSovereigntyZonesPage() {
       <TrustPostureSummary state={state} />
       <HandshakeSimulator onComplete={loadDashboard} />
       <DataPanel state={state} loading={loading} error={error} onRefresh={loadDashboard} />
+      <HandoffResolverEvidencePanel resolver={state.handoffResolver} />
       <section className="px-6 py-20 md:py-28">
         <div className="mx-auto max-w-5xl rounded-[2rem] border border-sky-300/20 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.18),transparent_38%),#07101d] p-8 text-center md:p-14">
           <Layers3 className="mx-auto mb-6 h-10 w-10 text-sky-300" />
